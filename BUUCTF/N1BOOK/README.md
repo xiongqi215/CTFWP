@@ -107,3 +107,13 @@ name=test' and (updatexml('anything',concat('~',(selselectect flag from fl4g)),'
 ```
 ![](pic/afr1_1.png)
 ![](pic/afr1_2.png)
+
+## afr_2
+查看源码，看到有图片路径引用
+![](pic/afr2_1.png)
+
+尝试访问`/img/`目录
+![](pic/afr2_2.png)
+判断可能存在目录穿透，尝试访问`/img../`,得到FLAG
+![](pic/afr2_3.png)
+
