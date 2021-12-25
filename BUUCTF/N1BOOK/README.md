@@ -220,3 +220,79 @@ python flask_session_cookie_manager3.py  encode -s "Drmhze6EPcv0fN_81Bj-nA" -t "
 > - 环境变量中可能存在secret_key，这时也可以通过environ进行读取：/proc/[pid]/environ
 >
 > **其中pid可用self代替，表示当前用户进程**
+
+
+# 0x03 [WEB进阶]
+
+## SSRF
+
+书上原题，点击`intersting challenge` 可以看到源码：
+```php
+<?php 
+highlight_file(__FILE__);
+function check_inner_ip($url) 
+{ 
+    $match_result=preg_match('/^(http|https)?:\/\/.*(\/)?.*$/',$url); 
+    if (!$match_result) 
+    { 
+        die('url fomat error'); 
+    } 
+    try 
+    { 
+        $url_parse=parse_url($url); 
+    } 
+    catch(Exception $e) 
+    { 
+        die('url fomat error'); 
+        return false; 
+    } 
+    $hostname=$url_parse['host']; 
+    $ip=gethostbyname($hostname); 
+    $int_ip=ip2long($ip); 
+    return ip2long('127.0.0.0')>>24 == $int_ip>>24 || ip2long('10.0.0.0')>>24 == $int_ip>>24 || ip2long('172.16.0.0')>>20 == $int_ip>>20 || ip2long('192.168.0.0')>>16 == $int_ip>>16; 
+} 
+
+function safe_request_url($url) 
+{ 
+     
+    if (check_inner_ip($url)) 
+    { 
+        echo $url.' is inner ip'; 
+    } 
+    else 
+    {
+        $ch = curl_init(); 
+        curl_setopt($ch, CURLOPT_URL, $url); 
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1); 
+        curl_setopt($ch, CURLOPT_HEADER, 0); 
+        $output = curl_exec($ch); 
+        $result_info = curl_getinfo($ch); 
+        if ($result_info['redirect_url']) 
+        { 
+            safe_request_url($result_info['redirect_url']); 
+        } 
+        curl_close($ch); 
+        var_dump($output); 
+    } 
+     
+} 
+
+$url = $_GET['url']; 
+if(!empty($url)){ 
+    safe_request_url($url); 
+} 
+?>
+```
+**代码审计** ：
+
+首先程序通过`self_request_url`函数进行参数检验，`self_request_url`函数中又通过`check_inner_ip`进行本地IP校验，如果为本地则退出；
+审计`check_inner_ip`，可知函数中:
+- 通过正则校验，参数需为http或https协议，
+- 通过`parse_url`函数进行解析，获取到url中`host_name`进行校验
+审计`safe_request_url`，可知函数中:
+- 使用CURL库进行url访问，并打印内容
+
+故本题可以利用parse_url函数与CURL解析规则不一致[详解这篇文章](https://www.cnblogs.com/tr1ple/p/11137159.html)，payload:
+```
+http://a@127.0.0.1:80@baidu.com/flag.php
+```
